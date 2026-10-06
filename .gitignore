@@ -1,0 +1,31 @@
+# Built artifacts
+build/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Gradle
+.gradle/
+gradle-app.setting
+local.properties
+
+# Android/IDE
+*.iml
+.idea/
+.cxx/
+.externalNativeBuild/
+
+# Signing material — never commit these
+*.jks
+*.keystore
+keystore.properties
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Local tooling
+/sdk/
+/gradle-8.6/

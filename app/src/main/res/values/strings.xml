@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ARGUN Mapper</string>
+    <string name="ble_notification_channel">ARGUN Mapper Connection</string>
+    <string name="ble_notification_title">ARGUN Mapper Connected</string>
+    <string name="ble_notification_text">ARGUN Mapper is running in the background. Tap to open.</string>
+    <string name="scanning_for_devices">Scanning for devices…</string>
+    <string name="no_devices_found">No ARGUN devices found nearby.</string>
+    <string name="connected">Connected to %s</string>
+    <string name="button_mapping">Button Mapping</string>
+    <string name="press_argun_button">Press a button on your ARGUN</string>
+    <string name="select_phone_key">Select a key on your phone</string>
+    <string name="dpad_row_title">D-Pad</string>
+    <string name="game_button_row_title">Game Buttons</string>
+    <string name="action_row_title">Actions</string>
+    <string name="nav_row_title">Navigation</string>
+    <string name="restore_defaults">Restore Defaults</string>
+    <string name="reset_mappings">Reset Mappings</string>
+    <string name="confirm_reset">Are you sure you want to reset all mappings?</string>
+    <string name="permission_required">Permission required</string>
+    <string name="bluetooth_required">Bluetooth is required to connect to ARGUN</string>
+    <string name="enable_bluetooth">Enable Bluetooth</string>
+    <string name="help">Help</string>
+    <string name="how_to_use_title">How to Use</string>
+    <string name="how_to_use_1">1. Turn on your ARGUN and enable Bluetooth on your phone.</string>
+    <string name="how_to_use_2">2. Tap \"Scan\" to find your ARGUN (name: ARGunGame).</string>
+    <string name="how_to_use_3">3. Select your ARGUN to connect.</string>
+    <string name="how_to_use_4">4. Open \"Button Mapping\" and press an ARGUN button, then choose the corresponding phone key.</string>
+    <string name="how_to_use_5">5. Open a game and enjoy!</string>
+    <string name="about">About</string>
+    <string name="about_text">Open-source key mapper for ARGUN (Blackfin AR003).\n\nFCCID: 2AMXIAR003\nModel: AR003\n\nDeveloped for the ARGUN community. Free to use and modify.</string>
+    <string name="connected_device">Connected: %s</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="mapping_saved" formatted="false">Mapping saved for %1$s → %2$s</string>
+    <string name="device_name">ARGunGame</string>
+    <string name="accessibility_description">ARGUN Mapper converts ARGUN button presses into Android key events.</string>
+    <string name="scan">Scan</string>
+    <string name="stop">Stop</string>
+    <string name="ready_to_scan">Ready to scan</string>
+    <string name="select_device">Select a device to connect</string>
+    <string name="no_argun_found">No ARGUN found. Make sure it is powered on and in range.</string>
+    <string name="mapping_saved_toast">Mapping saved</string>
+    <string name="defaults_restored">Default mappings restored</string>
+    <string name="test_button">Test</string>
+</resources>

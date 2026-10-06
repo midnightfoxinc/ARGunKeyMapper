@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        INJECT_EVENTS is signature|privileged, so a normal install cannot hold it.
+        Declaring it here is what lets the injection path exist at all: once the user
+        grants it via adb (`pm grant`), Shizuku's permission UI, or root, the app can
+        inject real key events. Without this declaration the grant has nothing to
+        attach to and every injection attempt is refused.
+    -->
+    <uses-permission android:name="android.permission.INJECT_EVENTS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Legacy Bluetooth permissions (Android < 12) -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!-- Bluetooth permissions (Android 12+) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
+        tools:targetApi="s" />
+
+    <!--
+        Location is required for BLE scanning on Android 6..11. Declared without a
+        maxSdkVersion because Fire OS 7.x (API 25) relies on it.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Foreground service for persistent BLE connection -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        tools:targetApi="q" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"
+        tools:targetApi="tiramisu" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!--
+        Package visibility (Android 11+). Needed so the privilege detector can see
+        whether Shizuku or a root manager is installed; on older releases these
+        queries are harmless.
+    -->
+    <queries>
+        <package android:name="moe.shizuku.privileged.api" />
+        <package android:name="moe.shizuku.privileged.api.debug" />
+        <package android:name="eu.chainfire.supersu" />
+        <package android:name="com.noshufou.android.su" />
+        <package android:name="com.topjohnwu.magisk" />
+        <package android:name="com.koushikdutta.superuser" />
+        <package android:name="me.phh.superuser" />
+        <package android:name="com.ryosoftware.suhelper" />
+    </queries>
+
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+
+    <!--
+        Android TV support (Fire OS, Chromecast with Google TV, ...). Declared
+        optional so the app still installs on phones and tablets.
+    -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <application
+        android:name=".ArgunMapperApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ArgunMapper">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|uiMode|smallestScreenSize|screenLayout|density"
+            android:launchMode="singleTask"
+            android:banner="@drawable/tv_banner"
+            android:screenOrientation="unspecified">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".ArgunService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+    </application>
+</manifest>
