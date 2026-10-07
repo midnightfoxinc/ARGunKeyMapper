@@ -62,10 +62,25 @@ class ArgunService : Service() {
         }
 
         /**
+         * Whether the service process currently holds a live [ArgunService].
+         *
+         * There is no supported way to query a non-exported service from another
+         * process, so the flag is set by the service itself. [applyHogp] uses it to
+         * avoid creating a short-lived background service that can never enter the
+         * foreground and would simply be killed.
+         */
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+
+        /**
          * Start or stop the HID peripheral in place, so switching to or from HOGP
          * mid-session does not require reconnecting the ARGUN.
          */
         fun applyHogp(context: Context, enabled: Boolean) {
+            // Nothing to apply to yet: the peripheral is started when the service
+            // connects, and it will read the current mode then.
+            if (!isRunning) return
             val intent = Intent(context, ArgunService::class.java).apply {
                 action = ACTION_APPLY_HOGP
                 putExtra(EXTRA_HOGP_ENABLED, enabled)
@@ -96,6 +111,7 @@ class ArgunService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         Log.d(TAG, "ArgunService onCreate")
         bleManager = BleManager(this)
         inputSimulator = InputSimulator(this)
@@ -114,7 +130,7 @@ class ArgunService : Service() {
                     stopSelf()
                     return START_NOT_STICKY
                 }
-                startForeground(NOTIFICATION_ID, buildNotification(address))
+                startForegroundSafely(address)
                 startHidPeripheralIfSelected()
                 connect(address)
             }
@@ -124,6 +140,10 @@ class ArgunService : Service() {
                 stopSelf()
             }
             ACTION_APPLY_HOGP -> {
+                // This service's InputSimulator is a different instance from the UI's,
+                // so it is still holding the mode it read at construction time. Pull
+                // the user's current choice before acting on it.
+                inputSimulator.refreshModeFromPrefs()
                 if (intent.getBooleanExtra(EXTRA_HOGP_ENABLED, false)) {
                     startHidPeripheralIfSelected()
                 } else {
@@ -132,6 +152,30 @@ class ArgunService : Service() {
             }
         }
         return START_STICKY
+    }
+
+    /**
+     * Promotes to foreground, tolerating a missing Bluetooth runtime permission.
+     *
+     * A `connectedDevice` foreground service requires at least one of
+     * BLUETOOTH_SCAN / CONNECT / ADVERTISE to be held. If the user revoked
+     * Bluetooth permission while we were connected, startForeground() throws
+     * SecurityException and an uncaught exception here takes the process down.
+     * Give up cleanly instead — the UI already tells the user to re-grant.
+     *
+     * @return true if the service is in the foreground.
+     */
+    private fun startForegroundSafely(address: String): Boolean = try {
+        startForeground(NOTIFICATION_ID, buildNotification(address))
+        true
+    } catch (e: SecurityException) {
+        Log.e(TAG, "Cannot enter foreground without a Bluetooth permission", e)
+        stopSelf()
+        false
+    } catch (e: Exception) {
+        Log.e(TAG, "startForeground failed", e)
+        stopSelf()
+        false
     }
 
     private fun startHidPeripheralIfSelected() {
@@ -236,6 +280,7 @@ class ArgunService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "ArgunService onDestroy")
+        isRunning = false
         eventJob?.cancel()
         serviceScope.cancel()
         stopHidPeripheral()

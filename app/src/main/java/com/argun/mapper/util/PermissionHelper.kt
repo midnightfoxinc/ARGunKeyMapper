@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
+import android.util.Log
 
 /**
  * Helper for managing Bluetooth and location permissions.
@@ -16,7 +17,9 @@ object PermissionHelper {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             arrayOf(
                 "android.permission.BLUETOOTH_SCAN",
-                "android.permission.BLUETOOTH_CONNECT"
+                "android.permission.BLUETOOTH_CONNECT",
+                // HOGP advertises as a peripheral, which is gated separately.
+                "android.permission.BLUETOOTH_ADVERTISE"
             )
         }
         else -> {
@@ -35,9 +38,16 @@ object PermissionHelper {
     }
 
     fun isBluetoothEnabled(context: Context): Boolean {
-        val bluetoothManager =
-            context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
-        return bluetoothManager?.adapter?.isEnabled == true
+        // Touching BluetoothAdapter requires BLUETOOTH_CONNECT on API 31+, so this
+        // throws SecurityException if the permission was revoked while running.
+        return try {
+            val bluetoothManager =
+                context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            bluetoothManager?.adapter?.isEnabled == true
+        } catch (e: SecurityException) {
+            Log.w(TAG, "BLUETOOTH_CONNECT not held: ${e.message}")
+            false
+        }
     }
 
     /**

@@ -98,6 +98,21 @@ class InputSimulator(private val context: Context) {
         lastError = if (effective == InjectionMode.NONE) describeUnavailable() else null
     }
 
+    /**
+     * Re-read the persisted mode into this instance.
+     *
+     * The UI and the foreground service each hold their own [InputSimulator], both
+     * backed by the same SharedPreferences. A mode chosen in the UI while the service
+     * is already running only reaches the service's copy through here — otherwise the
+     * service would keep acting on the value it read at construction time, and
+     * switching *to* HOGP mid-session would start nothing until reconnect.
+     */
+    fun refreshModeFromPrefs() {
+        mode = InjectionMode.valueOf(
+            prefs.getString(KEY_MODE, null) ?: InjectionMode.NONE.name
+        )
+    }
+
     /** Convenience for one-tap enabling from the UI. */
     fun tryEnableBest(): InjectionStatus {
         val best = detectPrivileges().bestAvailableMode()

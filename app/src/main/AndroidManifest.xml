@@ -24,6 +24,14 @@
         tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
         tools:targetApi="s" />
+    <!--
+        Required by HOGP on Android 12+ (API 31+): acting as a BLE peripheral means
+        advertising, which is a separate permission from scanning or connecting.
+        Without this, BluetoothLeAdvertiser.startAdvertising throws
+        SecurityException: Need android.permission.BLUETOOTH_ADVERTISE.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"
+        tools:targetApi="s" />
 
     <!--
         Location is required for BLE scanning on Android 6..11. Declared without a
