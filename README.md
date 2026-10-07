@@ -213,11 +213,13 @@ you can confirm the route works before starting a game.
 **Enable automatically** picks HOGP when the device supports it, then root, then an
 already-granted `INJECT_EVENTS`. Pick a route by hand if you would rather not use HOGP.
 
-> **HOGP is implemented and compiles, but has not been run against a real ARGUN.**
-> Everything else here was also built without hardware, so treat first-run behaviour on
-> your own device as unverified. If HOGP misbehaves, `adb logcat -s HidPeripheral` will
-> say whether the host connected and whether reports were delivered — please open an
-> issue with that output.
+> **Verified so far:** HOGP advertising starts correctly on a real phone (Android 15) —
+> `adb logcat -s HidPeripheral` logs `Advertising as ARGUN Mapper Gamepad`. What is *not*
+> yet confirmed is a HID host actually pairing and key events reaching a game, which needs
+> the manual pairing step above. The other routes were also built without hardware, so
+> treat their first-run behaviour as unverified. If HOGP misbehaves, `adb logcat -s
+> HidPeripheral` will say whether the host connected and whether reports were delivered —
+> please open an issue with that output.
 
 ## Protocol notes
 
