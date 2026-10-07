@@ -3,7 +3,10 @@ package com.argun.mapper.data.repository
 import android.util.Log
 import android.view.KeyEvent
 import com.argun.mapper.data.dao.ButtonBindingDao
+import com.argun.mapper.data.dao.SavedDeviceDao
 import com.argun.mapper.data.entity.ButtonBinding
+import com.argun.mapper.data.entity.SavedDevice
+import com.argun.mapper.model.ArgunDevice
 import com.argun.mapper.model.KeyMapping
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -11,7 +14,10 @@ import kotlinx.coroutines.flow.map
 /**
  * Stores and retrieves ARGUN button -> phone key mappings.
  */
-class KeyMappingRepository(private val dao: ButtonBindingDao) {
+class KeyMappingRepository(
+    private val dao: ButtonBindingDao,
+    private val deviceDao: SavedDeviceDao
+) {
 
     /** All persisted mappings, keyed by ARGUN button tag (e.g. "B4"). */
     val allBindings: Flow<List<KeyMapping>> =
@@ -53,6 +59,25 @@ class KeyMappingRepository(private val dao: ButtonBindingDao) {
         phoneKeyName = phoneKeyName,
         action = action
     )
+
+    /** Devices the user has connected to before. */
+    val savedDevices: Flow<List<SavedDevice>> = deviceDao.getAll()
+
+    suspend fun mostRecentDevice(): SavedDevice? = deviceDao.getMostRecent()
+
+    suspend fun rememberDevice(device: ArgunDevice) {
+        deviceDao.upsert(
+            SavedDevice(
+                address = device.address,
+                name = device.name,
+                lastSeen = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun forgetDevice(address: String) = deviceDao.forget(address)
+
+    suspend fun forgetAllDevices() = deviceDao.forgetAll()
 
     companion object {
         private const val TAG = "KeyMappingRepo"

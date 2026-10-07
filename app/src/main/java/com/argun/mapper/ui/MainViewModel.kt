@@ -46,7 +46,9 @@ data class MainUiState(
     val injectionMode: InjectionMode = InjectionMode.NONE,
     val privileges: PrivilegeStatus = PrivilegeStatus(),
     val injectionDetail: String = "",
-    val injectionWorking: Boolean = false
+    val injectionWorking: Boolean = false,
+    val savedDevices: List<com.argun.mapper.data.entity.SavedDevice> = emptyList(),
+    val autoReconnectAddress: String? = null
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -63,8 +65,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository: KeyMappingRepository? by lazy {
         try {
-            AppDatabase.getDatabase(getApplication())
-                .let { KeyMappingRepository(it.buttonBindingDao()) }
+            val db = AppDatabase.getDatabase(getApplication())
+            KeyMappingRepository(db.buttonBindingDao(), db.savedDeviceDao())
         } catch (e: Exception) {
             Log.e(TAG, "Could not open database", e)
             null
@@ -75,7 +77,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.value = _uiState.value.copy(bluetoothAvailable = checkBluetooth())
         observeMappings()
         seedDefaultsIfEmpty()
-        refreshInjectionState()
+        observeSavedDevices()
+        // NOT refreshInjectionState() here: probing `su` on app start blocks on the
+        // root manager's dialog, which is what made the permission prompt appear
+        // the moment the user opened the app. Detection runs lazily when the
+        // settings card is first shown instead.
+    }
+
+    private fun observeSavedDevices() {
+        val repo = repository ?: return
+        viewModelScope.launch {
+            repo.savedDevices.collect { list ->
+                _uiState.value = _uiState.value.copy(savedDevices = list)
+                if (_uiState.value.autoReconnectAddress == null) {
+                    list.firstOrNull()?.let { _uiState.value = _uiState.value.copy(autoReconnectAddress = it.address) }
+                }
+            }
+        }
     }
 
     // ------------------------------------------------------- input injection
@@ -102,6 +120,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { inputSimulator.setMode(mode) }
                 .onFailure { Log.w(TAG, "Could not set injection mode: ${it.message}") }
+            // setMode falls back when the requested route is unusable, so ask about
+            // the route that actually ended up selected.
+            ArgunService.applyHogp(getApplication(), inputSimulator.mode == InjectionMode.HOGP)
             refreshInjectionState()
         }
     }
@@ -110,6 +131,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun enableInjectionAutomatically() {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { inputSimulator.tryEnableBest() }
+            refreshInjectionState()
+        }
+    }
+
+    /**
+     * Fire `su` so the root manager shows its dialog. The user approves, then
+     * detection re-runs and the route becomes usable.
+     */
+    fun requestRootGrant() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { inputSimulator.requestRootGrant() }
             refreshInjectionState()
         }
     }
@@ -264,11 +296,45 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             connectedDevice = device,
             statusMessage = "Connecting to ${device.name}…"
         )
+        rememberDevice(device)
         try {
             ArgunService.startConnect(getApplication(), device.address)
         } catch (e: Exception) {
             Log.e(TAG, "Could not start service", e)
             _uiState.value = _uiState.value.copy(statusMessage = "Could not start connection")
+        }
+    }
+
+    /** Reconnect to the most recently used device, without scanning. */
+    fun reconnectSaved() {
+        val address = _uiState.value.autoReconnectAddress ?: return
+        val name = _uiState.value.savedDevices.firstOrNull { it.address == address }?.name ?: "ARGUN"
+        connect(ArgunDevice(name = name, address = address))
+    }
+
+    /** Forget a device so it no longer appears in the saved list or reconnects. */
+    fun forgetDevice(address: String) {
+        val repo = repository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            repo.forgetDevice(address)
+            if (_uiState.value.autoReconnectAddress == address) {
+                _uiState.value = _uiState.value.copy(
+                    autoReconnectAddress = _uiState.value.savedDevices.firstOrNull()?.address
+                )
+            }
+        }
+    }
+
+    /** Forget every saved device. */
+    fun forgetAllDevices() {
+        val repo = repository ?: return
+        viewModelScope.launch(Dispatchers.IO) { repo.forgetAllDevices() }
+    }
+
+    private fun rememberDevice(device: ArgunDevice) {
+        val repo = repository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            repo.rememberDevice(device)
         }
     }
 

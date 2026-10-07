@@ -27,6 +27,7 @@ class RootInjectionStrategy : InjectionStrategy {
         private const val TAG = "RootInjection"
         private const val SU = "/system/bin/su"
         private const val COMMAND_TIMEOUT_S = 3L
+    private const val PROBE_TIMEOUT_S = 30L
     }
 
     override val displayName: String = "Root (su)"
@@ -48,6 +49,29 @@ class RootInjectionStrategy : InjectionStrategy {
         PrivilegeDetector.findSuBinary() == null -> "No su binary found (device not rooted?)"
         !isAvailable() -> "su found but denied. Grant ARGUN Mapper superuser access."
         else -> null
+    }
+
+    /**
+     * Fire `su` once, by itself, so the root manager shows its dialog and the user
+     * can approve. Re-probes afterwards. This is the action behind the UI's
+     * "Grant root access" button — detection alone cannot trigger the dialog.
+     */
+    fun requestRootGrant(packageName: String): Boolean {
+        val su = PrivilegeDetector.findSuBinary() ?: return false
+        return try {
+            val process = ProcessBuilder(su, "-c", "id -u")
+                .redirectErrorStream(true)
+                .start()
+            val ok = process.waitFor(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
+            if (ok) {
+                PrivilegeDetector.invalidateRootCache()
+                rootWorks = PrivilegeDetector.isRootAvailable(force = true)
+            }
+            ok
+        } catch (e: Exception) {
+            Log.e(TAG, "Root grant request failed: ${e.message}")
+            false
+        }
     }
 
     override fun inject(keyCode: Int, down: Boolean): Boolean {

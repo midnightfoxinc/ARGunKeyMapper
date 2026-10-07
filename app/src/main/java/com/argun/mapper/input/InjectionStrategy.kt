@@ -13,6 +13,13 @@ enum class InjectionMode {
     NONE,
 
     /**
+     * The app is a HID-over-GATT peripheral and the platform's HID host profile is
+     * driving it. Needs no Android permission at all — the Bluetooth stack turns
+     * HID reports into key events itself.
+     */
+    HOGP,
+
+    /**
      * `INJECT_EVENTS` has been granted (via adb, Shizuku's UI, or root). Events go
      * straight through [android.hardware.input.InputManager].
      */

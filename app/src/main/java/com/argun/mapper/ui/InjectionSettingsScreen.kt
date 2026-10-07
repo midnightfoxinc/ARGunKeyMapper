@@ -23,12 +23,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.argun.mapper.input.InjectionMode
+import com.argun.mapper.input.PrivilegeDetector
 import com.argun.mapper.input.PrivilegeStatus
 
 /**
@@ -45,6 +47,12 @@ fun InjectionSettingsCard(
     modifier: Modifier = Modifier
 ) {
     val privileges: PrivilegeStatus = state.privileges
+
+    // Probe once, on first appearance, so the user isn't hit with a root dialog
+    // before they've even seen the settings screen.
+    LaunchedEffect(state.privileges.rootManagerInstalled) {
+        viewModel.refreshInjectionState()
+    }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -86,18 +94,31 @@ fun InjectionSettingsCard(
 
             Spacer(Modifier.height(12.dp))
 
+            // Routes are always selectable. Disabling them was the bug: the radio went grey
+            // and the user had no way to pick a route they had just granted.
+            ModeOption(
+                label = "Bluetooth HID gamepad (HOGP)",
+                description = if (privileges.hogpSupported) {
+                    "No permission needed — recommended"
+                } else {
+                    "Not supported on this device"
+                },
+                selected = state.injectionMode == InjectionMode.HOGP,
+                enabled = true,
+                onSelect = { viewModel.setInjectionMode(InjectionMode.HOGP) }
+            )
             ModeOption(
                 label = "Root (su)",
-                description = "Recommended if rooted. No permission needed.",
+                description = if (privileges.rootAvailable) "Available" else "Not granted",
                 selected = state.injectionMode == InjectionMode.ROOT,
-                enabled = privileges.rootAvailable,
+                enabled = true,
                 onSelect = { viewModel.setInjectionMode(InjectionMode.ROOT) }
             )
             ModeOption(
                 label = "Permission (adb / Shizuku)",
-                description = "Uses INJECT_EVENTS, granted externally.",
+                description = if (privileges.injectEventsGranted) "Granted" else "Not granted",
                 selected = state.injectionMode == InjectionMode.PERMISSION,
-                enabled = privileges.injectEventsGranted,
+                enabled = true,
                 onSelect = { viewModel.setInjectionMode(InjectionMode.PERMISSION) }
             )
             ModeOption(
@@ -109,13 +130,25 @@ fun InjectionSettingsCard(
             )
 
             Spacer(Modifier.height(12.dp))
+
+            // Root needs a live permission grant, which detection alone cannot
+            // trigger — the root manager only shows its dialog when `su` is
+            // actually executed.
+            if (PrivilegeDetector.findSuBinary() != null) {
+                Button(
+                    onClick = { viewModel.requestRootGrant() },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Grant root access") }
+                Spacer(Modifier.height(8.dp))
+            }
+
             Button(
                 onClick = { viewModel.enableInjectionAutomatically() },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Enable automatically") }
 
             Spacer(Modifier.height(16.dp))
-            DetectionSummary(privileges)
+            DetectionSummary(privileges, state.injectionMode)
         }
     }
 }
@@ -156,17 +189,27 @@ private fun ModeOption(
 }
 
 @Composable
-private fun DetectionSummary(privileges: PrivilegeStatus) {
+private fun DetectionSummary(privileges: PrivilegeStatus, mode: InjectionMode) {
     Column {
         Text("Detected on this device", style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(6.dp))
+        DetectionRow("BLE peripheral (HOGP)", privileges.hogpSupported)
         DetectionRow("Root access", privileges.rootAvailable)
         DetectionRow("Root manager installed", privileges.rootManagerInstalled)
         DetectionRow("Shizuku installed", privileges.shizukuInstalled)
         DetectionRow("Shizuku running", privileges.shizukuRunning)
         DetectionRow("INJECT_EVENTS granted", privileges.injectEventsGranted)
 
-        if (!privileges.canBeEnabled) {
+        if (mode == InjectionMode.HOGP && privileges.hogpSupported) {
+            // HOGP needs one manual step the app cannot do for the user: pairing.
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "One-time setup: open Settings › Bluetooth, tap \"ARGUN Mapper Gamepad\" " +
+                    "to pair, then connect your ARGUN. No root and no adb needed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else if (!privileges.canBeEnabled) {
             Spacer(Modifier.height(12.dp))
             Text(
                 "None of these are available, so button presses will be shown in the app " +

@@ -1,10 +1,12 @@
 package com.argun.mapper.input
 
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /**
  * Detects which input-injection privileges this device offers.
@@ -24,6 +26,7 @@ import java.io.File
 object PrivilegeDetector {
 
     private const val TAG = "PrivilegeDetector"
+    private const val PROBE_TIMEOUT_S = 30L
 
     /**
      * `INJECT_EVENTS` has no constant in [Manifest.permission] because it is not
@@ -76,28 +79,73 @@ object PrivilegeDetector {
         }
 
     /**
+     * Cached result of the last root probe, plus the moment it was taken.
+     *
+     * Probing `su` is expensive and, the first time, *blocks* while the root
+     * manager shows its permission dialog. Caching keeps the UI responsive and
+     * stops the app from spawning a fresh `su` on every state refresh.
+     */
+    @Volatile
+    private var cachedRoot: Boolean? = null
+
+    @Volatile
+    private var cachedRootAt: Long = 0L
+
+    private const val ROOT_CACHE_TTL_MS = 30_000L
+
+    /** Forget the cached probe so the next call re-tests `su` immediately. */
+    fun invalidateRootCache() {
+        cachedRoot = null
+        cachedRootAt = 0L
+    }
+
+    /**
      * True when a `su` binary exists and actually grants root.
      *
-     * Existence alone is not enough: Magisk's stub `su` returns failure until the
-     * app is added to the superuser list, so we execute it and inspect the result.
+     * Existence alone is not enough: Magisk's stub `su` reports failure until the
+     * app is added to the superuser list, so we execute it and read the result.
+     *
+     * [force] bypasses the cache — used after the user has just been through the
+     * root manager's permission dialog.
      */
-    fun isRootAvailable(): Boolean = findSuBinary()?.let { su ->
-        try {
+    fun isRootAvailable(force: Boolean = false): Boolean {
+        val cached = cachedRoot
+        if (!force && cached != null &&
+            System.currentTimeMillis() - cachedRootAt < ROOT_CACHE_TTL_MS
+        ) {
+            return cached
+        }
+
+        val result = probeSu()
+        cachedRoot = result
+        cachedRootAt = System.currentTimeMillis()
+        Log.i(TAG, "Root probe result: $result")
+        return result
+    }
+
+    private fun probeSu(): Boolean {
+        val su = findSuBinary() ?: return false
+        return try {
             val process = ProcessBuilder(su, "-c", "id -u")
                 .redirectErrorStream(true)
                 .start()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+            // The first invocation blocks on the root manager's dialog, which the
+            // user drives by hand. 30s tolerates that; a short timeout here is what
+            // made root look permanently unavailable right after granting it.
+            if (!process.waitFor(PROBE_TIMEOUT_S, TimeUnit.SECONDS)) {
                 process.destroy()
-                return@let false
+                Log.w(TAG, "su probe timed out - probably waiting on a root dialog")
+                return false
             }
+            val output = process.inputStream.bufferedReader().use { it.readText() }
             // A working root shell reports uid 0.
-            output.trim().substringAfter("uid=").trim().startsWith("0")
+            val uid = output.trim().substringAfter("uid=", "")
+            uid.trim().startsWith("0")
         } catch (e: Exception) {
             Log.w(TAG, "su present but not usable: ${e.message}")
             false
         }
-    } ?: false
+    }
 
     fun findSuBinary(): String? =
         SU_PATHS.firstOrNull { path -> File(path).canExecute() }
@@ -141,7 +189,8 @@ object PrivilegeDetector {
             rootManagerInstalled = hasRootManager(context),
             shizukuInstalled = shizuku,
             shizukuRunning = shizukuRunning,
-            injectEventsGranted = granted
+            injectEventsGranted = granted,
+            hogpSupported = isHogpSupported(context)
         )
     }
 
@@ -153,6 +202,28 @@ object PrivilegeDetector {
     } catch (e: Exception) {
         false
     }
+
+    /**
+     * True when this device can act as a BLE peripheral, which is what HOGP needs.
+     *
+     * [BluetoothLeAdvertiser] arrived in API 21, but plenty of older and TV
+     * chipsets report no advertiser at all, so ask the adapter rather than
+     * trusting the SDK level alone. This does not touch the radio — it only
+     * allocates the advertiser object.
+     */
+    fun isHogpSupported(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) return false
+        return try {
+            val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            manager?.adapter?.bluetoothLeAdvertiser != null
+        } catch (e: SecurityException) {
+            Log.w(TAG, "No BLUETOOTH_CONNECT permission: ${e.message}")
+            false
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not query BLE advertiser: ${e.message}")
+            false
+        }
+    }
 }
 
 /**
@@ -163,10 +234,19 @@ data class PrivilegeStatus(
     val rootManagerInstalled: Boolean = false,
     val shizukuInstalled: Boolean = false,
     val shizukuRunning: Boolean = false,
-    val injectEventsGranted: Boolean = false
+    val injectEventsGranted: Boolean = false,
+    val hogpSupported: Boolean = false
 ) {
-    /** The most capable mode currently usable without the user changing anything. */
+    /**
+     * The route to use when the user taps "Enable automatically".
+     *
+     * HOGP comes first: it needs no permission at all, so it is the only option
+     * on a stock Android 12+ device, and it is far better suited to a trigger
+     * than root — a `su` process per event cannot keep up with a fast trigger.
+     * The privileged routes stay available as explicit choices.
+     */
     fun bestAvailableMode(): InjectionMode = when {
+        hogpSupported -> InjectionMode.HOGP
         rootAvailable -> InjectionMode.ROOT
         injectEventsGranted -> InjectionMode.PERMISSION
         else -> InjectionMode.NONE
@@ -174,6 +254,6 @@ data class PrivilegeStatus(
 
     /** True when the user could plausibly enable injection with a little help. */
     val canBeEnabled: Boolean
-        get() = rootAvailable || rootManagerInstalled || shizukuInstalled || shizukuRunning
-            || injectEventsGranted
+        get() = hogpSupported || rootAvailable || rootManagerInstalled || shizukuInstalled
+            || shizukuRunning || injectEventsGranted
 }

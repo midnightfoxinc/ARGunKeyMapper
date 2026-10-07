@@ -46,6 +46,8 @@ class MainActivity : ComponentActivity() {
                         vm.connect(device)
                         showMapping = true
                     },
+                    onReconnectSaved = { vm.reconnectSaved() },
+                    onForgetDevice = { vm.forgetDevice(it) },
                     showMapping = showMapping,
                     onBackToScanner = { showMapping = false },
                     showRationale = showRationale,

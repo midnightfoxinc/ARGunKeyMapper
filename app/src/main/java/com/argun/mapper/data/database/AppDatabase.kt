@@ -5,11 +5,18 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.argun.mapper.data.dao.ButtonBindingDao
+import com.argun.mapper.data.dao.SavedDeviceDao
 import com.argun.mapper.data.entity.ButtonBinding
+import com.argun.mapper.data.entity.SavedDevice
 
-@Database(entities = [ButtonBinding::class], version = 1, exportSchema = false)
+@Database(
+    entities = [ButtonBinding::class, SavedDevice::class],
+    version = 2,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun buttonBindingDao(): ButtonBindingDao
+    abstract fun savedDeviceDao(): SavedDeviceDao
 
     companion object {
         @Volatile

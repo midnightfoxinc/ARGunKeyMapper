@@ -11,6 +11,9 @@ import com.argun.mapper.model.ArgunButton
  * Delivery depends on what the device allows. See [InjectionMode] for the three
  * routes and [PrivilegeDetector] for how availability is discovered:
  *
+ *  - `HOGP`      — app is a HID-over-GATT peripheral; the Bluetooth stack turns
+ *                  HID reports into key events. Needs no permission, and is the
+ *                  only route that works on stock Android 12+.
  *  - `ROOT`      — device is rooted; uses `su`. Works without any permission.
  *  - `PERMISSION`— INJECT_EVENTS granted via adb / Shizuku / root; uses InputManager.
  *  - `NONE`      — neither available. Events are decoded and shown in-app, but the
@@ -29,6 +32,13 @@ class InputSimulator(private val context: Context) {
 
     private val rootStrategy = RootInjectionStrategy()
     private val permissionStrategy = PermissionInjectionStrategy(context)
+
+    /**
+     * Set by the service when HOGP mode is active, so status() can report live
+     * peripheral state instead of assuming delivery succeeded.
+     */
+    @Volatile
+    var hogpStatusProvider: (() -> Boolean)? = null
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -50,6 +60,18 @@ class InputSimulator(private val context: Context) {
 
     /** Human-readable explanation of the current state, for the settings screen. */
     fun status(): InjectionStatus {
+        if (mode == InjectionMode.HOGP) {
+            val ready = hogpStatusProvider?.invoke() ?: false
+            return InjectionStatus(
+                mode = mode,
+                working = ready,
+                detail = when {
+                    !isUsable(InjectionMode.HOGP) -> "This device cannot act as a BLE peripheral"
+                    ready -> "Advertising as a HID gamepad — host connected"
+                    else -> "Advertising as a HID gamepad — pair it in Bluetooth settings to connect"
+                }
+            )
+        }
         val strategy = resolveStrategy()
         return InjectionStatus(
             mode = mode,
@@ -87,8 +109,28 @@ class InputSimulator(private val context: Context) {
         return status()
     }
 
+    /**
+     * Fire `su` on its own so the root manager shows its dialog and the user can
+     * approve. Returns the user-facing status afterwards. Detection alone cannot
+     * trigger the dialog — this is the action behind the UI's grant button.
+     */
+    fun requestRootGrant(): InjectionStatus {
+        val granted = runCatching {
+            rootStrategy.requestRootGrant(context.packageName)
+        }.getOrDefault(false)
+        if (granted) {
+            // Re-detect so the cached probe is invalidated and refreshed.
+            setMode(InjectionMode.ROOT)
+        }
+        return status()
+    }
+
     /** Send a raw key event. */
     fun sendKey(keyCode: Int, down: Boolean): Boolean {
+        // HOGP never routes through a strategy — the Bluetooth stack synthesises the
+        // key events from HID reports fed by HidPeripheral, so there is nothing to
+        // inject here and reporting failure would be wrong.
+        if (mode == InjectionMode.HOGP) return true
         val strategy = resolveStrategy()
         if (strategy == null) {
             lastSuccess = false
@@ -131,12 +173,14 @@ class InputSimulator(private val context: Context) {
         sendKey(keyCode ?: button.defaultKeyCode, isDown)
 
     private fun isUsable(candidate: InjectionMode): Boolean = when (candidate) {
+        InjectionMode.HOGP -> PrivilegeDetector.isHogpSupported(context)
         InjectionMode.ROOT -> rootStrategy.isAvailable()
         InjectionMode.PERMISSION -> permissionStrategy.isAvailable()
         InjectionMode.NONE -> true
     }
 
     private fun resolveStrategy(): InjectionStrategy? = when (mode) {
+        InjectionMode.HOGP -> null // delivered by the HID peripheral, not by a strategy
         InjectionMode.ROOT -> rootStrategy.takeIf { it.isAvailable() }
         InjectionMode.PERMISSION -> permissionStrategy.takeIf { it.isAvailable() }
         InjectionMode.NONE -> null
@@ -147,10 +191,12 @@ class InputSimulator(private val context: Context) {
         return when {
             privileges.rootAvailable -> "Root available but not selected"
             privileges.injectEventsGranted -> "INJECT_EVENTS granted but not selected"
+            privileges.hogpSupported -> "HID gamepad available — select it to deliver keys with no permission"
             privileges.shizukuRunning -> "Shizuku is running — use it to grant INJECT_EVENTS"
             privileges.shizukuInstalled -> "Shizuku installed but not running"
             privileges.rootManagerInstalled -> "Root manager found — grant superuser access"
-            else -> "No injection privilege. Root this device, or grant via adb: " +
+            else -> "No injection privilege, and this device cannot act as a HID peripheral. " +
+                "Root it, or grant via adb: " +
                 "adb shell pm grant com.argun.mapper android.permission.INJECT_EVENTS"
         }
     }

@@ -13,8 +13,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.argun.mapper.R
 import com.argun.mapper.ble.BleManager
+import com.argun.mapper.ble.HidPeripheral
 import com.argun.mapper.data.database.AppDatabase
 import com.argun.mapper.data.repository.KeyMappingRepository
+import com.argun.mapper.input.InjectionMode
 import com.argun.mapper.input.InputSimulator
 import com.argun.mapper.model.ArgunButton
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +41,8 @@ class ArgunService : Service() {
 
         private const val ACTION_CONNECT = "com.argun.mapper.CONNECT"
         private const val ACTION_DISCONNECT = "com.argun.mapper.DISCONNECT"
+        private const val ACTION_APPLY_HOGP = "com.argun.mapper.APPLY_HOGP"
+        private const val EXTRA_HOGP_ENABLED = "hogp_enabled"
 
         fun startConnect(context: Context, address: String) {
             val intent = Intent(context, ArgunService::class.java).apply {
@@ -56,10 +60,23 @@ class ArgunService : Service() {
             // so a plain start is correct here while the service is already running.
             context.startService(intent)
         }
+
+        /**
+         * Start or stop the HID peripheral in place, so switching to or from HOGP
+         * mid-session does not require reconnecting the ARGUN.
+         */
+        fun applyHogp(context: Context, enabled: Boolean) {
+            val intent = Intent(context, ArgunService::class.java).apply {
+                action = ACTION_APPLY_HOGP
+                putExtra(EXTRA_HOGP_ENABLED, enabled)
+            }
+            runCatching { context.startService(intent) }
+        }
     }
 
     private lateinit var bleManager: BleManager
     private lateinit var inputSimulator: InputSimulator
+    private lateinit var hidPeripheral: HidPeripheral
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var eventJob: Job? = null
 
@@ -69,7 +86,8 @@ class ArgunService : Service() {
 
     private val repository: KeyMappingRepository? by lazy {
         try {
-            KeyMappingRepository(AppDatabase.getDatabase(applicationContext).buttonBindingDao())
+            val db = AppDatabase.getDatabase(applicationContext)
+            KeyMappingRepository(db.buttonBindingDao(), db.savedDeviceDao())
         } catch (e: Exception) {
             Log.e(TAG, "Could not open database; using default mappings", e)
             null
@@ -81,6 +99,8 @@ class ArgunService : Service() {
         Log.d(TAG, "ArgunService onCreate")
         bleManager = BleManager(this)
         inputSimulator = InputSimulator(this)
+        hidPeripheral = HidPeripheral(this)
+        inputSimulator.hogpStatusProvider = { hidPeripheral.currentStatus.ready }
         createNotificationChannel()
     }
 
@@ -95,14 +115,33 @@ class ArgunService : Service() {
                     return START_NOT_STICKY
                 }
                 startForeground(NOTIFICATION_ID, buildNotification(address))
+                startHidPeripheralIfSelected()
                 connect(address)
             }
             ACTION_DISCONNECT -> {
+                stopHidPeripheral()
                 stopForegroundCompat()
                 stopSelf()
             }
+            ACTION_APPLY_HOGP -> {
+                if (intent.getBooleanExtra(EXTRA_HOGP_ENABLED, false)) {
+                    startHidPeripheralIfSelected()
+                } else {
+                    stopHidPeripheral()
+                }
+            }
         }
         return START_STICKY
+    }
+
+    private fun startHidPeripheralIfSelected() {
+        if (inputSimulator.mode != InjectionMode.HOGP) return
+        val started = hidPeripheral.start()
+        Log.i(TAG, "HOGP peripheral start=$started")
+    }
+
+    private fun stopHidPeripheral() {
+        runCatching { hidPeripheral.stop() }
     }
 
     private fun connect(address: String) {
@@ -143,6 +182,12 @@ class ArgunService : Service() {
                 }
                 ArgunButton.parseEvent(notification.rawValue)?.let { (button, isDown) ->
                     val keyCode = keyCodes[button.tag] ?: button.defaultKeyCode
+                    // HOGP runs alongside whichever strategy is selected: the
+                    // peripheral reports button state, the OS turns it into key
+                    // events. When another route is active this is simply ignored.
+                    if (inputSimulator.mode == InjectionMode.HOGP) {
+                        hidPeripheral.onButton(button, isDown)
+                    }
                     val ok = inputSimulator.injectArgunButton(button, isDown, keyCode)
                     Log.d(TAG, "Button ${button.tag} -> keyCode $keyCode (ok=$ok)")
                 }
@@ -193,6 +238,7 @@ class ArgunService : Service() {
         Log.d(TAG, "ArgunService onDestroy")
         eventJob?.cancel()
         serviceScope.cancel()
+        stopHidPeripheral()
         bleManager.disconnect()
         super.onDestroy()
     }

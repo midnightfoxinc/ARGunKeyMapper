@@ -54,6 +54,8 @@ fun ArgunMapperApp(
     viewModel: MainViewModel,
     onScanRequested: () -> Unit,
     onDeviceSelected: (ArgunDevice) -> Unit,
+    onReconnectSaved: () -> Unit,
+    onForgetDevice: (String) -> Unit,
     showMapping: Boolean,
     onBackToScanner: () -> Unit,
     showRationale: Boolean,
@@ -82,7 +84,9 @@ fun ArgunMapperApp(
         ConnectScreen(
             state = state,
             onScan = onScanRequested,
-            onDeviceSelected = onDeviceSelected
+            onDeviceSelected = onDeviceSelected,
+            onReconnectSaved = onReconnectSaved,
+            onForgetDevice = onForgetDevice
         )
     }
 }
@@ -91,7 +95,9 @@ fun ArgunMapperApp(
 private fun ConnectScreen(
     state: MainUiState,
     onScan: () -> Unit,
-    onDeviceSelected: (ArgunDevice) -> Unit
+    onDeviceSelected: (ArgunDevice) -> Unit,
+    onReconnectSaved: () -> Unit,
+    onForgetDevice: (String) -> Unit
 ) {
     Scaffold { padding ->
         Column(
@@ -122,6 +128,14 @@ private fun ConnectScreen(
             }
 
             if (state.devices.isEmpty()) {
+                if (state.savedDevices.isNotEmpty()) {
+                    SavedDevicesList(
+                        devices = state.savedDevices,
+                        onReconnect = onReconnectSaved,
+                        onForget = onForgetDevice
+                    )
+                    Spacer(Modifier.height(16.dp))
+                }
                 Button(onClick = onScan, enabled = !state.scanning) {
                     Text(if (state.scanning) "Scanning…" else "Scan for ARGUN")
                 }
@@ -326,6 +340,53 @@ private fun MappingRow(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) {
                 Text("Test", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SavedDevicesList(
+    devices: List<com.argun.mapper.data.entity.SavedDevice>,
+    onReconnect: () -> Unit,
+    onForget: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            "Previously used",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        devices.forEach { saved ->
+            Card(
+                onClick = onReconnect,
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(saved.name, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            saved.address,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    TextButton(onClick = { onForget(saved.address) }) {
+                        Text("Forget", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
         }
     }
