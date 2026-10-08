@@ -47,6 +47,22 @@ screen, and runs on current Android phones, Android TV and Fire OS.
 - **Runs on Android TV / Fire OS** as well as phones and tablets (minSdk 21)
 - **No hardcoded MAC address** — works with any AR003 unit in range
 
+## Screenshots
+  <table>
+  <tr>
+    <td align="center"><b>Start screen</b></td>
+    <td align="center"><b>Scanning</b></td>
+    <td align="center"><b>Device found</b></td>
+    <td align="center"><b>Remembered device</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/1.png" width="270" height="480"></td>
+    <td><img src="docs/screenshots/2.png" width="270" height="480"></td>
+    <td><img src="docs/screenshots/3.png" width="270" height="480"></td>
+    <td><img src="docs/screenshots/6.png" width="270" height="480"></td>
+  </tr>
+</table>
+
 ## Requirements
 
 | | |
