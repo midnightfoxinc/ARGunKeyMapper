@@ -7,11 +7,11 @@
 
 <img src="docs/hero.png" alt="ARGUN Mapper — Blackfin AR003 Bluetooth LE gamepad" width="100%">
 
-Open-source Privacy Friendly Android app for the **AR GUN** and **AR Blaster** gaming accessory (Blackfin AR003, FCCID `2AMXIAR003`, Other AR Blaster)
+Open-source Privacy Friendly Android app for the **AR GUN** and **AR Blaster** gaming accessory (Blackfin AR Blaster Pro AR003, FCCID `2AMXIAR003`, or any other AR Blaster)
 that turns it into a Bluetooth gamepad for any Android phone or Android TV.
 
-This is an **open-source alternative to the ARGUN vendor's bundled app** (shipped as
-`ARGun2021.apk`, a Unity app published under `com.superchips`). That app is closed
+This is an **open-source alternative to the vendor's Chinese bundled app** (shipped as
+`ARGun.apk`, a Unity app published under `com.superchips`). Vendor app is closed
 source, works only with its own first-party titles, and does not install on modern
 Android. This one speaks the same BLE protocol, adds a full customisable mapping
 screen, and runs on current Android phones, Android TV and Fire OS.
@@ -57,7 +57,7 @@ screen, and runs on current Android phones, Android TV and Fire OS.
 |---|---|
 | Android | 5.0 (API 21) or newer — includes Fire OS 7.x (API 25) |
 | Bluetooth | BLE 4.0+ |
-| Device | Any Blackfin AR003 ARGUN | Any AR Blaster |
+| Device | Any Blackfin AR Blaster Pro AR003 | Any other AR Blaster |
 | For input | Root, or a second Bluetooth device for HOGP — see below |
 
 ## Building
@@ -361,12 +361,11 @@ app/src/main/java/com/argun/mapper/
 
 ## Contributing
 
-Issues and pull requests are welcome. Since the project is aimed at the ARGUN community,
+Issues and pull requests are welcome. Since the project is aimed at the AR BLASTER community,
 please keep it lightweight and dependency-light.
 
 ## Acknowledgements
 
-- Blackfin Co. for the ARGUN gaming accessory
 - The Android Bluetooth LE community
 - Everyone contributing mappings and fixes
 
