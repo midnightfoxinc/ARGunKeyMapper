@@ -83,18 +83,26 @@ class KeyMappingRepository(
         private const val TAG = "KeyMappingRepo"
 
         /**
-         * Factory defaults, matching the physical layout of the ARGUN.
+         * Factory defaults, measured from a real AR003.
+         *
+         * The stick is not a D-pad and the face buttons form an unlabelled cross,
+         * so the vendor's B2..B9 ordering does not match the physical layout — B5
+         * is stick up and B4 is stick right, and the cross reads B2 up, B3 right,
+         * B9 bottom, B8 left. The trigger has no B-number at all; it arrives as a
+         * handshake string, so it gets its own pseudo-button.
+         *
          * Users can override any of these from the mapping screen.
          */
         val DEFAULTS: Map<String, KeyMapping> = mapOf(
-            "B2" to KeyMapping("B2", KeyEvent.KEYCODE_BUTTON_A, "Trigger (A)"),
-            "B3" to KeyMapping("B3", KeyEvent.KEYCODE_BUTTON_B, "Game Button 2 (B)"),
-            "B4" to KeyMapping("B4", KeyEvent.KEYCODE_DPAD_UP, "DPAD Up"),
-            "B5" to KeyMapping("B5", KeyEvent.KEYCODE_DPAD_RIGHT, "DPAD Right"),
-            "B6" to KeyMapping("B6", KeyEvent.KEYCODE_DPAD_DOWN, "DPAD Down"),
-            "B7" to KeyMapping("B7", KeyEvent.KEYCODE_DPAD_LEFT, "DPAD Left"),
-            "B8" to KeyMapping("B8", KeyEvent.KEYCODE_DPAD_CENTER, "DPAD Center"),
-            "B9" to KeyMapping("B9", KeyEvent.KEYCODE_BUTTON_X, "Game Button 3 (X)")
+            "B2" to KeyMapping("B2", KeyEvent.KEYCODE_BUTTON_Y, "Face Y (cross up)"),
+            "B3" to KeyMapping("B3", KeyEvent.KEYCODE_BUTTON_B, "Face B (cross right)"),
+            "B4" to KeyMapping("B4", KeyEvent.KEYCODE_DPAD_RIGHT, "Stick Right"),
+            "B5" to KeyMapping("B5", KeyEvent.KEYCODE_DPAD_UP, "Stick Up"),
+            "B6" to KeyMapping("B6", KeyEvent.KEYCODE_DPAD_LEFT, "Stick Left"),
+            "B7" to KeyMapping("B7", KeyEvent.KEYCODE_DPAD_DOWN, "Stick Down"),
+            "B8" to KeyMapping("B8", KeyEvent.KEYCODE_BUTTON_A, "Face A (cross left)"),
+            "B9" to KeyMapping("B9", KeyEvent.KEYCODE_BUTTON_X, "Face X (cross bottom)"),
+            "TRIGGER" to KeyMapping("TRIGGER", KeyEvent.KEYCODE_BUTTON_A, "Trigger (A)")
         )
     }
 }

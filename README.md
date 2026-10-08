@@ -99,18 +99,30 @@ used** — tap one to reconnect without scanning, or **Forget** to remove it.
 
 ## Button mapping
 
-Factory defaults, matching the physical layout of the ARGUN:
+Factory defaults, measured from a real AR003 rather than taken from the vendor's notes —
+the two do not agree. The gun has no marked D-pad and no labelled face buttons: what
+looks like a D-pad is a free-moving stick, and four unlabelled buttons sit in a cross
+around it.
 
-| ARGUN | Physical button | Default key | Typical use |
-|-------|-----------------|-------------|-------------|
-| `B2` | Trigger | `KEYCODE_BUTTON_A` | Fire |
-| `B3` | Game button 2 | `KEYCODE_BUTTON_B` | Switch weapon |
-| `B4` | D-Pad up | `KEYCODE_DPAD_UP` | Aim up |
-| `B5` | D-Pad right | `KEYCODE_DPAD_RIGHT` | Strafe right |
-| `B6` | D-Pad down | `KEYCODE_DPAD_DOWN` | Crouch |
-| `B7` | D-Pad left | `KEYCODE_DPAD_LEFT` | Strafe left |
-| `B8` | D-Pad push | `KEYCODE_DPAD_CENTER` | Confirm / jump |
-| `B9` | Game button 3 | `KEYCODE_BUTTON_X` | Grenade |
+| Payload | Physical control | Default key | Typical use |
+|---------|-------------------|-------------|-------------|
+| `ARGun KeyPressed` | Pistol-grip trigger | `KEYCODE_BUTTON_A` | Fire |
+| `B5` | Stick up | `KEYCODE_DPAD_UP` | Aim up |
+| `B4` | Stick right | `KEYCODE_DPAD_RIGHT` | Strafe right |
+| `B7` | Stick down | `KEYCODE_DPAD_DOWN` | Crouch |
+| `B6` | Stick left | `KEYCODE_DPAD_LEFT` | Strafe left |
+| `B2` | Cross, top | `KEYCODE_BUTTON_Y` | Grenade |
+| `B3` | Cross, right | `KEYCODE_BUTTON_B` | Switch weapon |
+| `B9` | Cross, bottom | `KEYCODE_BUTTON_X` | Sprint / use |
+| `B8` | Cross, left | `KEYCODE_BUTTON_A` | Confirm / jump |
+
+Two motions on the stick produce no payload at all and so cannot be mapped: pushing the
+stick straight in, and moving it diagonally. The firmware only reports the four cardinal
+directions — a diagonal arrives as nothing at all, and on a fast diagonal push it lands
+as whichever cardinal the stick ended nearest.
+
+The A/B/X/Y names are this app's own convention, chosen to match the cross layout above.
+The gun itself carries no labels.
 
 Every mapping is editable from the mapping screen and stored locally, so your choices
 survive restarts. **Restore Defaults** puts the table above back.
@@ -149,7 +161,7 @@ One-time setup:
 2. Open **Settings › Bluetooth** and pair with **`ARGUN Mapper Gamepad`**.
 3. Play. Games see a normal gamepad.
 
-Because the ARGUN's D-pad is reported as *both* a hat switch and ordinary buttons,
+Because the ARGUN's stick is reported as *both* a hat switch and ordinary buttons,
 games that read either style work without special handling.
 
 HOGP is also the fastest route by a wide margin — a root injection forks a `su` process
@@ -243,12 +255,18 @@ Notifications are enabled by writing `0x0001` to the characteristic's CCCD
 
 | Payload | Meaning |
 |---------|---------|
-| `"B2DOWN"` + NUL padding | Button `B2` pressed |
-| `"B2UP"` + NUL padding | Button `B2` released |
-| `"ARGun KeyPressed"` | Trigger / handshake |
-| 16 × `0x00` | Idle, no action |
+| `"B{N}DOWN"` + NUL padding | Button `B{N}` pressed, `N` in `2`..`9` |
+| `"B{N}UP"` + NUL padding | Button `B{N}` released |
+| `"ARGun KeyPressed"` | Trigger pressed (also the device handshake) |
+| 16 × `0x00` | Trigger released, or idle |
 
 Note the case: the handshake reads `ARGun`, not `ARGUN`.
+
+The trigger is the odd one out — it has no `B{N}` form of its own and reports itself as
+the handshake string, which doubles as the device's keepalive. Treating it as a button is
+therefore opt-in, under **Input delivery › Trigger (handshake)**, so idle traffic cannot
+fire by accident. The `B{N}` numbering does not follow the physical layout; see
+[Button mapping](#button-mapping) for the measured correspondence.
 
 ### The HID service we expose
 
@@ -269,14 +287,14 @@ the Report itself, distinguished by properties (read-only vs readable + notifiab
 The input report is 4 bytes, no report ID:
 
 ```
-byte 0   bits 0..3  D-pad hat switch, 0=N .. 6=W, 8=no direction
+byte 0   bits 0..3  stick hat switch, 0=N .. 6=W, 8=no direction
 byte 1   bits 0..7  buttons, B2 -> bit 0 .. B9 -> bit 7
 byte 2   unused
 byte 3   unused
 ```
 
-The D-pad buttons are deliberately reported **twice** — once as a hat switch and once
-as ordinary buttons — so games that read either style work unmodified.
+The stick is deliberately reported **twice** — once as a hat switch and once as ordinary
+buttons — so games that read either style work unmodified.
 
 ## Project layout
 

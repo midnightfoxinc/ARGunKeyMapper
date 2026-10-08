@@ -192,11 +192,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Seed the factory mappings, and re-seed them when they are missing entries.
+     *
+     * The defaults shipped before the physical layout was measured, and they had
+     * the four stick directions swapped (B4/B5 and B6/B7). Re-seeding on a missing
+     * entry repairs installs that predate the fix, while `Restore Defaults` remains
+     * the way to discard deliberate user choices.
+     */
     private fun seedDefaultsIfEmpty() {
         val repo = repository ?: return
         viewModelScope.launch {
             val existing = repo.allBindings.firstOrNullSafe()
             if (existing.isNullOrEmpty()) {
+                repo.saveDefaultMappings()
+            } else if (existing.none { it.argunButton == "TRIGGER" }) {
+                Log.i(TAG, "Re-seeding defaults: stored mappings predate the measured layout")
                 repo.saveDefaultMappings()
             }
         }
