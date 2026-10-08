@@ -236,11 +236,18 @@ private fun DetectionSummary(privileges: PrivilegeStatus, mode: InjectionMode) {
         DetectionRow("INJECT_EVENTS granted", privileges.injectEventsGranted)
 
         if (mode == InjectionMode.HOGP && privileges.hogpSupported) {
-            // HOGP needs one manual step the app cannot do for the user: pairing.
+            // HOGP needs a second Bluetooth device to act as the HID host. Say which,
+            // because the obvious guess — pairing the phone with its own gamepad —
+            // is impossible: Android hides a peripheral advertised by the same
+            // adapter, so it will never appear in this phone's Bluetooth settings.
             Spacer(Modifier.height(12.dp))
             Text(
-                "One-time setup: open Settings › Bluetooth, tap \"ARGUN Mapper Gamepad\" " +
-                    "to pair, then connect your ARGUN. No root and no adb needed.",
+                "To use this route, connect a second Bluetooth device — a PC, TV, or " +
+                    "other phone — and pair it with \"ARGUN Mapper Gamepad\" there. " +
+                    "That device receives the presses as a normal gamepad. " +
+                    "This phone cannot pair with its own gamepad, so on a handset with " +
+                    "no second device this route will stay idle; use Root or " +
+                    "\"Disabled\" here instead.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

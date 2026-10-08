@@ -7,13 +7,30 @@
 
 <img src="docs/hero.png" alt="ARGUN Mapper — Blackfin AR003 Bluetooth LE gamepad" width="100%">
 
-Open-source Android app for the **ARGUN** gaming accessory (Blackfin AR003, FCCID `2AMXIAR003`)
+Open-source Privacy Friendly Android app for the **AR GUN** and **AR Blaster** gaming accessory (Blackfin AR003, FCCID `2AMXIAR003`, Other AR Blaster)
 that turns it into a Bluetooth gamepad for any Android phone or Android TV.
 
+This is an **open-source alternative to the ARGUN vendor's bundled app** (shipped as
+`ARGun2021.apk`, a Unity app published under `com.superchips`). That app is closed
+source, works only with its own first-party titles, and does not install on modern
+Android. This one speaks the same BLE protocol, adds a full customisable mapping
+screen, and runs on current Android phones, Android TV and Fire OS.
+
 > **How buttons reach your games** — Android normally blocks apps from injecting key
-> events, but the app can present itself as a real Bluetooth game pad, which needs no
-> permission and works on stock Android 12+. See
-> [Input delivery](#input-delivery-read-this).
+> events. There are four routes, and which ones work depends on your device; the app
+> detects them and says so plainly. See [Input delivery](#input-delivery-read-this).
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Start screen](docs/screenshots/1.png) | ![Scanning](docs/screenshots/2.png) |
+| ![Device found](docs/screenshots/3.png) | ![Remembered device](docs/screenshots/6.png) |
+
+| | |
+|---|---|
+| Start — one button to scan | Scanning for a nearby ARGUN |
+| A matching device, with signal strength | Remembered devices reconnect without scanning |
 
 ## Features
 
@@ -24,7 +41,7 @@ that turns it into a Bluetooth gamepad for any Android phone or Android TV.
 - **Customisable mapping** — tap any button and choose which Android key it emits
 - **Remember & forget devices** — reconnect to a known ARGUN without scanning
 - **Persistent mappings** via Room, with one-tap restore of factory defaults
-- **Four delivery routes** — HOGP, root, adb/Shizuku-granted permission, or off
+- **Four delivery routes** — root, HOGP, adb/Shizuku-granted permission, or off
 - **Auto-detection** that reports what the current device actually supports
 - **Foreground service** keeps the connection alive while you play
 - **Runs on Android TV / Fire OS** as well as phones and tablets (minSdk 21)
@@ -36,8 +53,8 @@ that turns it into a Bluetooth gamepad for any Android phone or Android TV.
 |---|---|
 | Android | 5.0 (API 21) or newer — includes Fire OS 7.x (API 25) |
 | Bluetooth | BLE 4.0+ |
-| Device | Any Blackfin AR003 ARGUN |
-| For input | Nothing extra if you use HOGP; otherwise root or adb (see below) |
+| Device | Any Blackfin AR003 ARGUN | Any AR Blaster |
+| For input | Root, or a second Bluetooth device for HOGP — see below |
 
 ## Building
 
@@ -89,8 +106,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 4. Tap a device to connect — a foreground-service notification confirms the connection.
 5. On the mapping screen, scroll to **Input delivery** and enable a route
    (**Enable automatically** picks the best one available).
-6. If you chose **HOGP**, pair once under **Settings › Bluetooth** with
-   `ARGUN Mapper Gamepad`.
+6. If you chose **HOGP**, pair once from your **second** Bluetooth device (PC, TV or
+   other phone) with `ARGUN Mapper Gamepad` — not from this one, which cannot see it.
 7. Tap a button row to change its key, and **Test** to verify input arrives.
 8. Open your game and play.
 
@@ -133,46 +150,28 @@ Android does not let an ordinary installed app inject key events into other apps
 `injectInputEvent()` needs `android.permission.INJECT_EVENTS`, which is
 `signature|privileged` — grantable only to system apps or by an external helper.
 
-**If the ARGUN "connects but buttons do nothing", this is why.** There are four ways
-around it. Only the first needs no privilege at all, and it is the one to try first:
+**If the ARGUN "connects but buttons do nothing", this is why.** The app decodes every
+press correctly either way — what differs is whether anything can *deliver* it. There are
+four routes, and which ones work depends on your device and on what else you own:
 
-| Route | Needs | Works on stock Android 12+ |
+| Route | Needs | Works on stock, unrooted Android |
 |---|---|---|
-| **HOGP** (Bluetooth gamepad) | nothing | **yes** |
-| Root (`su`) | a rooted device | no |
-| adb / Shizuku | a granted `INJECT_EVENTS` | no |
+| **Root** (`su`) | a rooted device | yes, if rooted |
+| HOGP (Bluetooth gamepad) | a **second** Bluetooth device | only if you have one |
+| adb / Shizuku | a granted `INJECT_EVENTS` | no — see below |
 | Disabled | — | in-app display only |
 
-Set the route under **Input delivery** on the mapping screen.
+Set the route under **Input delivery** on the mapping screen; the app detects what your
+device supports and reports it. **Enable automatically** picks the best available.
 
-### Route 1 — Bluetooth HID gamepad (HOGP)
+> **On a stock, unrooted phone with no second Bluetooth device, none of these can work.**
+> That is a platform restriction rather than a gap in this app, and it is worth knowing
+> before you spend an evening on it. Rooting the device is the usual answer.
 
-No root, no adb, no permission of any kind. This is the **only** route that works on a
-stock Android 12+ device, where `INJECT_EVENTS` cannot be granted at all.
+### Route 1 — Root (recommended)
 
-The app turns into a BLE peripheral advertising a HID game pad (service `0x1812`). The
-Bluetooth stack on the other end connects as a HID host and generates the key events
-itself — the app never injects anything, so there is no permission to check.
-
-One-time setup:
-
-1. Connect your ARGUN as usual and pick **Bluetooth HID gamepad (HOGP)** under
-   **Input delivery**.
-2. Open **Settings › Bluetooth** and pair with **`ARGUN Mapper Gamepad`**.
-3. Play. Games see a normal gamepad.
-
-Because the ARGUN's stick is reported as *both* a hat switch and ordinary buttons,
-games that read either style work without special handling.
-
-HOGP is also the fastest route by a wide margin — a root injection forks a `su` process
-per event, which cannot keep up with a fast trigger. If the ARGUN is connected to a PC,
-TV, or second phone, that device can pair as the HID host instead and the ARGUN drives
-it directly.
-
-### Route 2 — Root
-
-Needs a working `su`. No Android permission involved, so it works on a stock-but-rooted
-Fire TV stick.
+Needs a working `su`, and no Android permission is involved at all. This is the route
+that works on a stock-but-rooted Fire TV stick, tablet or phone.
 
 1. Install the app.
 2. Open it once so the root manager prompts you, and grant superuser access.
@@ -183,8 +182,34 @@ The app dispatches via `input motionevent DOWN/UP <code>` on Android 10+, and
 a complete press in one call — so the release event is dropped. Held inputs will feel
 different on API 21–28.
 
-Root works, but it is slow: each event forks a `su` process. A fast trigger will
-outrun it, so prefer HOGP where it is available.
+Root works, but it is slow: each event forks a `su` process. A fast trigger will outrun
+it, so prefer HOGP where it is genuinely available.
+
+### Route 2 — Bluetooth HID gamepad (HOGP)
+
+No root, no adb, no permission of any kind — but it needs a **second** Bluetooth device
+to receive the input.
+
+The app turns into a BLE peripheral advertising a HID game pad (service `0x1812`). A
+HID host on another device connects, and the Bluetooth stack there generates the key
+events itself. The app never injects anything, so there is no permission to check.
+
+Setup:
+
+1. Connect your ARGUN as usual and pick **Bluetooth HID gamepad (HOGP)** under
+   **Input delivery**.
+2. On your **PC, TV, or second phone**, pair with **`ARGUN Mapper Gamepad`**.
+3. Play on that device. It sees a normal gamepad.
+
+**A phone cannot pair with its own gamepad.** Android's Bluetooth settings hides a
+peripheral advertised by the same adapter, so `ARGUN Mapper Gamepad` will not appear in
+*Pair new device* on the phone running the app, and the connection cannot be made from
+inside the app either. This is why HOGP advertises successfully on a handset and then
+sits idle forever waiting for a host that can never arrive. If you have no second
+Bluetooth device, use Route 1 instead.
+
+Because the ARGUN's stick is reported as *both* a hat switch and ordinary buttons,
+games that read either style work without special handling.
 
 ### Route 3 — adb
 
@@ -222,15 +247,17 @@ you can confirm the route works before starting a game.
 
 ### Choosing a route
 
-**Enable automatically** picks HOGP when the device supports it, then root, then an
-already-granted `INJECT_EVENTS`. Pick a route by hand if you would rather not use HOGP.
+**Enable automatically** picks root when it is available, then HOGP, then an
+already-granted `INJECT_EVENTS`. Pick a route by hand if you would rather not use root.
 
-> **Verified so far:** HOGP advertising starts correctly on a real phone (Android 15) —
-> `adb logcat -s HidPeripheral` logs `Advertising as ARGUN Mapper Gamepad`. What is *not*
-> yet confirmed is a HID host actually pairing and key events reaching a game, which needs
-> the manual pairing step above. The other routes were also built without hardware, so
-> treat their first-run behaviour as unverified. If HOGP misbehaves, `adb logcat -s
-> HidPeripheral` will say whether the host connected and whether reports were delivered —
+> **Verified so far:** BLE connection and button decoding are confirmed on a real AR003
+> (Android 15) — every physical control was identified by capturing its actual payload,
+> and the mapping table above is the result. HOGP advertising also starts correctly
+> (`adb logcat -s HidPeripheral` logs `Advertising as ARGUN Mapper Gamepad`), but on a
+> phone the HID host can never attach, for the reason given in Route 2, so key events
+> reaching an actual game remain unverified. The root route is the one to try on a
+> rooted device. If a route misbehaves, `adb logcat -s ArgunService HidPeripheral
+> InputSimulator` will show whether presses were decoded and where delivery stopped —
 > please open an issue with that output.
 
 ## Protocol notes

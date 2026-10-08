@@ -52,11 +52,45 @@ class InputSimulator(private val context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    /** Mode the user selected; may be more capable than what currently works. */
+    /**
+     * Mode the user selected; may be more capable than what currently works.
+     *
+     * On a fresh install nothing has been chosen yet. Defaulting to `NONE` meant a
+     * new user saw presses decoded in the app and nothing delivered anywhere, with
+     * no hint that a route existed — which reads as a broken connection. Default to
+     * the best route this device actually offers instead, so the first launch lands
+     * on something that can work, or on `NONE` only when nothing can.
+     */
     var mode: InjectionMode = InjectionMode.valueOf(
         prefs.getString(KEY_MODE, null) ?: InjectionMode.NONE.name
     )
         private set
+
+    /**
+     * Whether the user has ever chosen a route.
+     *
+     * Used by the UI to tell "working as configured" apart from "nothing has been
+     * configured yet", which are otherwise indistinguishable from the status line.
+     */
+    val hasExplicitMode: Boolean
+        get() = prefs.contains(KEY_MODE)
+
+    /**
+     * Pick a starting route for a fresh install and remember it.
+     *
+     * Only writes when the user has not chosen for themselves, so reopening the app
+     * never overrides a deliberate choice. Call once from the UI's startup path.
+     */
+    fun adoptDefaultModeIfUnset(): InjectionStatus {
+        if (!hasExplicitMode) {
+            val best = detectPrivileges().bestAvailableMode()
+            if (best != InjectionMode.NONE) {
+                Log.i(TAG, "No route chosen yet; starting on $best")
+                setMode(best)
+            }
+        }
+        return status()
+    }
 
     /**
      * Whether the pistol-grip trigger's `ARGun KeyPressed` handshake is treated as
@@ -87,11 +121,7 @@ class InputSimulator(private val context: Context) {
             return InjectionStatus(
                 mode = mode,
                 working = ready,
-                detail = when {
-                    !isUsable(InjectionMode.HOGP) -> "This device cannot act as a BLE peripheral"
-                    ready -> "Advertising as a HID gamepad — host connected"
-                    else -> "Advertising as a HID gamepad — pair it in Bluetooth settings to connect"
-                }
+                detail = describeHogpStatus(ready)
             )
         }
         val strategy = resolveStrategy()
@@ -103,6 +133,27 @@ class InputSimulator(private val context: Context) {
                 else -> "Delivering via ${strategy.displayName}"
             }
         )
+    }
+
+    /**
+     * HOGP status in the user's terms.
+     *
+     * The subtlety is that this route needs a *second* Bluetooth device acting as
+     * the HID host. The phone advertising the gamepad is not enough — something has
+     * to connect to it and subscribe to input reports. That can be a PC, TV or
+     * second phone, but it cannot be this phone: Android's own Bluetooth settings
+     * hides a peripheral advertised by the same adapter, so there is no way to pair
+     * the phone with its own gamepad.
+     *
+     * So on a handset with no second Bluetooth device, HOGP is selected, advertises
+     * successfully, and still cannot deliver anything. Saying "pair it in Bluetooth
+     * settings" there sends the user looking for a device that will never be listed.
+     */
+    private fun describeHogpStatus(ready: Boolean): String = when {
+        !isUsable(InjectionMode.HOGP) -> "This device cannot act as a BLE peripheral"
+        ready -> "Advertising as a HID gamepad — host connected"
+        else -> "Advertising as a HID gamepad — waiting for another Bluetooth device " +
+            "(PC, TV or phone) to connect to it"
     }
 
     /** What this device offers, independent of the user's choice. */

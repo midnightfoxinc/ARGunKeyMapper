@@ -113,6 +113,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Re-detects root/Shizuku/adb availability and the current delivery mode. */
     fun refreshInjectionState() {
         viewModelScope.launch(Dispatchers.IO) {
+            // Runs on the settings card's first appearance, not on app start: probing
+            // `su` too early pops the root manager's dialog unprompted. A fresh
+            // install has no route yet, so take the opportunity to pick one.
+            runCatching { inputSimulator.adoptDefaultModeIfUnset() }
             val privileges = runCatching { inputSimulator.detectPrivileges() }
                 .getOrDefault(PrivilegeStatus())
             val status = runCatching { inputSimulator.status() }.getOrNull()
