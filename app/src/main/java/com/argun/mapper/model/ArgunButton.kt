@@ -62,6 +62,21 @@ enum class ArgunButton(
         tag = "B9",
         defaultFunction = "Game Button 3",
         defaultKeyCode = android.view.KeyEvent.KEYCODE_BUTTON_X
+    ),
+
+    /**
+     * The pistol-grip trigger, which has no `B{N}` payload of its own.
+     *
+     * This gun reports the trigger as the 16-byte handshake `ARGun KeyPressed`
+     * followed by an all-zero payload on release, instead of the `B2DOWN`/`B2UP`
+     * form every other button uses. It is a pseudo-button: [tag] is deliberately
+     * not a `B{N}` name so it can never be confused with a real device button,
+     * and no device ever sends this string.
+     */
+    TRIGGER(
+        tag = "TRIGGER",
+        defaultFunction = "Trigger",
+        defaultKeyCode = android.view.KeyEvent.KEYCODE_BUTTON_A
     );
 
     companion object {

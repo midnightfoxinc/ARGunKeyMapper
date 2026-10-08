@@ -28,6 +28,16 @@ class InputSimulator(private val context: Context) {
         private const val TAG = "InputSimulator"
         private const val PREFS = "argun_injection"
         private const val KEY_MODE = "mode"
+
+        /**
+         * Treat the pistol-grip trigger's `ARGun KeyPressed` handshake as a fire press.
+         *
+         * This gun reports the trigger as that handshake on press and an all-zero
+         * payload on release, instead of the `B2DOWN`/`B2UP` form every other button
+         * uses. It is opt-in because the same handshake is also the device's keepalive,
+         * so guessing silently would fire on idle traffic.
+         */
+        private const val KEY_TRIGGER = "trigger_handshake"
     }
 
     private val rootStrategy = RootInjectionStrategy()
@@ -47,6 +57,18 @@ class InputSimulator(private val context: Context) {
         prefs.getString(KEY_MODE, null) ?: InjectionMode.NONE.name
     )
         private set
+
+    /**
+     * Whether the pistol-grip trigger's `ARGun KeyPressed` handshake is treated as
+     * a fire press. Off by default — the same handshake is also the device's
+     * keepalive, so this is a deliberate opt-in, not a guess.
+     */
+    var triggerHandshake: Boolean
+        get() = prefs.getBoolean(KEY_TRIGGER, false)
+        set(value) {
+            prefs.edit { putBoolean(KEY_TRIGGER, value) }
+            Log.i(TAG, "Trigger handshake delivery = $value")
+        }
 
     @Volatile
     var lastError: String? = null

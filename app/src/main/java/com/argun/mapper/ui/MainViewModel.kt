@@ -5,10 +5,14 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.argun.mapper.ArgunService
@@ -47,6 +51,12 @@ data class MainUiState(
     val privileges: PrivilegeStatus = PrivilegeStatus(),
     val injectionDetail: String = "",
     val injectionWorking: Boolean = false,
+    /**
+     * Whether the pistol-grip trigger's `ARGun KeyPressed` handshake is treated as
+     * a fire press. Off by default — that handshake is also the device's keepalive,
+     * so this is a deliberate opt-in, not a guess.
+     */
+    val triggerHandshake: Boolean = false,
     val savedDevices: List<com.argun.mapper.data.entity.SavedDevice> = emptyList(),
     val autoReconnectAddress: String? = null
 )
@@ -110,7 +120,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 privileges = privileges,
                 injectionMode = inputSimulator.mode,
                 injectionDetail = status?.detail ?: "Unknown",
-                injectionWorking = status?.working == true
+                injectionWorking = status?.working == true,
+                triggerHandshake = inputSimulator.triggerHandshake
             )
         }
     }
@@ -133,6 +144,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { inputSimulator.tryEnableBest() }
             refreshInjectionState()
         }
+    }
+
+    /**
+     * Treat the pistol-grip trigger's `ARGun KeyPressed` handshake as a fire press.
+     *
+     * This gun reports the trigger as that handshake on press and an all-zero
+     * payload on release, instead of the `B2DOWN`/`B2UP` form every other button
+     * uses. Opt-in because the same handshake is also the device's keepalive.
+     */
+    fun setTriggerHandshake(enabled: Boolean) {
+        inputSimulator.triggerHandshake = enabled
+        refreshInjectionState()
     }
 
     /**
@@ -296,6 +319,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             connectedDevice = device,
             statusMessage = "Connecting to ${device.name}…"
         )
+        registerButtonReceiver()
         rememberDevice(device)
         try {
             ArgunService.startConnect(getApplication(), device.address)
@@ -340,11 +364,55 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun disconnect() {
         ArgunService.stopService(getApplication())
+        unregisterButtonReceiver()
         _uiState.value = _uiState.value.copy(
             connectedDevice = null,
             lastPressedButton = null,
             statusMessage = "Disconnected"
         )
+    }
+
+    // ---------------------------------------------------------- button events
+
+    private var buttonReceiverRegistered = false
+
+    private val buttonReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val tag = intent?.getStringExtra(ArgunService.EXTRA_BUTTON_TAG) ?: return
+            ArgunButton.values().firstOrNull { it.tag == tag }?.let(::noteButtonPressed)
+        }
+    }
+
+    /**
+     * Listen for decoded button events from [ArgunService].
+     *
+     * The service is the only component connected to the ARGUN, so without this the
+     * mapping screen could never show that a press arrived — presses were decoded
+     * and silently dropped, which looked identical to a dead connection.
+     */
+    private fun registerButtonReceiver() {
+        if (buttonReceiverRegistered) return
+        buttonReceiverRegistered = true
+        ArgunService.buttonObservers++
+        val filter = IntentFilter(ArgunService.ACTION_BUTTON_EVENT)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.registerReceiver(
+                getApplication(),
+                buttonReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            getApplication<Application>().registerReceiver(buttonReceiver, filter)
+        }
+    }
+
+    private fun unregisterButtonReceiver() {
+        if (!buttonReceiverRegistered) return
+        buttonReceiverRegistered = false
+        ArgunService.buttonObservers = (ArgunService.buttonObservers - 1).coerceAtLeast(0)
+        runCatching { getApplication<Application>().unregisterReceiver(buttonReceiver) }
     }
 
     // ---------------------------------------------------------------- mappings
@@ -391,6 +459,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         scanJob?.cancel()
+        unregisterButtonReceiver()
         super.onCleared()
     }
 }

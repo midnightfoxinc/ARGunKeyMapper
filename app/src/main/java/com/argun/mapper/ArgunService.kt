@@ -44,6 +44,36 @@ class ArgunService : Service() {
         private const val ACTION_APPLY_HOGP = "com.argun.mapper.APPLY_HOGP"
         private const val EXTRA_HOGP_ENABLED = "hogp_enabled"
 
+        /**
+         * Broadcast when a button is decoded, so the UI can show it.
+         *
+         * The service owns the BLE connection and is the only thing that sees button
+         * events, but the mapping screen lives in the ViewModel. Without a bridge
+         * between them the app decoded presses correctly and showed nothing, which
+         * looked identical to "buttons do not work".
+         *
+         * Explicitly not `PRIVATE`: a private broadcast would not leave the app's own
+         * UID, and the receiver is in this same app.
+         */
+        const val ACTION_BUTTON_EVENT = "com.argun.mapper.BUTTON_EVENT"
+        const val EXTRA_BUTTON_TAG = "button_tag"
+
+        fun broadcastButton(context: Context, tag: String) {
+            // Trivial and frequent — if the UI is not listening there is no point
+            // waking it up.
+            if (!hasObservers) return
+            context.sendBroadcast(
+                Intent(ACTION_BUTTON_EVENT).putExtra(EXTRA_BUTTON_TAG, tag)
+                    .setPackage(context.packageName)
+            )
+        }
+
+        /** Notified while the UI is listening, so idle presses cost nothing. */
+        @Volatile
+        var buttonObservers: Int = 0
+
+        val hasObservers: Boolean get() = buttonObservers > 0
+
         fun startConnect(context: Context, address: String) {
             val intent = Intent(context, ArgunService::class.java).apply {
                 action = ACTION_CONNECT
@@ -184,6 +214,24 @@ class ArgunService : Service() {
         Log.i(TAG, "HOGP peripheral start=$started")
     }
 
+    /**
+     * Translate the pistol-grip trigger's handshake into a press/release pair.
+     *
+     * This gun reports the trigger as `ARGun KeyPressed` on press and an all-zero
+     * payload on release, instead of the `B2DOWN`/`B2UP` form every other button
+     * uses. Returns a [ArgunButton.TRIGGER] event, or null for payloads that are
+     * neither the handshake nor the release.
+     *
+     * @return the trigger event, or null.
+     */
+    private fun handleTriggerHandshake(rawValue: String): Pair<ArgunButton, Boolean>? {
+        return when {
+            rawValue == "ARGun KeyPressed" -> ArgunButton.TRIGGER to true
+            rawValue.isEmpty() -> ArgunButton.TRIGGER to false
+            else -> null
+        }
+    }
+
     private fun stopHidPeripheral() {
         runCatching { hidPeripheral.stop() }
     }
@@ -220,11 +268,33 @@ class ArgunService : Service() {
             }
 
             bleManager.eventFlow.collectLatest { notification ->
+                // The trigger has no B{N} payload. This gun sends the device
+                // handshake on press and an all-zero payload on release, so it
+                // needs its own branch — otherwise the press is silently dropped.
+                if (inputSimulator.triggerHandshake) {
+                    val trigger = handleTriggerHandshake(notification.rawValue)
+                    if (trigger != null) {
+                        val (button, isDown) = trigger
+                        broadcastButton(applicationContext, button.tag)
+                        val keyCode = keyCodes[button.tag] ?: button.defaultKeyCode
+                        if (inputSimulator.mode == InjectionMode.HOGP) {
+                            hidPeripheral.onButton(button, isDown)
+                        }
+                        val ok = inputSimulator.injectArgunButton(button, isDown, keyCode)
+                        Log.d(TAG, "Button ${button.tag} (handshake) -> keyCode $keyCode (ok=$ok)")
+                        return@collectLatest
+                    }
+                }
+
                 if (!notification.isButtonEvent) {
                     Log.d(TAG, "Non-button event: ${notification.rawValue}")
                     return@collectLatest
                 }
                 ArgunButton.parseEvent(notification.rawValue)?.let { (button, isDown) ->
+                    // Tell the UI before doing anything else: this is the only signal
+                    // the user gets that a press was understood, and it must not
+                    // depend on which delivery route is selected.
+                    broadcastButton(applicationContext, button.tag)
                     val keyCode = keyCodes[button.tag] ?: button.defaultKeyCode
                     // HOGP runs alongside whichever strategy is selected: the
                     // peripheral reports button state, the OS turns it into key

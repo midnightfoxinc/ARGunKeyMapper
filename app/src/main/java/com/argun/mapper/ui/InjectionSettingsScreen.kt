@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -146,6 +147,40 @@ fun InjectionSettingsCard(
                 onClick = { viewModel.enableInjectionAutomatically() },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Enable automatically") }
+
+            Spacer(Modifier.height(8.dp))
+
+            // The pistol-grip trigger has no B{N} payload — this gun sends the
+            // device handshake on press and an all-zero payload on release. It is
+            // opt-in because that handshake is also the device's keepalive, so
+            // guessing silently would fire on idle traffic.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        "Trigger (handshake)",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        if (privileges.hogpSupported) {
+                            "ARGun KeyPressed → fire"
+                        } else {
+                            "No B-number for the trigger on this gun"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = state.triggerHandshake,
+                    onCheckedChange = { viewModel.setTriggerHandshake(it) }
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
             DetectionSummary(privileges, state.injectionMode)
