@@ -20,18 +20,6 @@ screen, and runs on current Android phones, Android TV and Fire OS.
 > events. There are four routes, and which ones work depends on your device; the app
 > detects them and says so plainly. See [Input delivery](#input-delivery-read-this).
 
-## Screenshots
-
-| | |
-|---|---|
-| ![Start screen](docs/screenshots/1.png) | ![Scanning](docs/screenshots/2.png) |
-| ![Device found](docs/screenshots/3.png) | ![Remembered device](docs/screenshots/6.png) |
-
-| | |
-|---|---|
-| Start — one button to scan | Scanning for a nearby ARGUN |
-| A matching device, with signal strength | Remembered devices reconnect without scanning |
-
 ## Features
 
 - **BLE scanning & connection** to any device advertising the ARGUN GATT service
