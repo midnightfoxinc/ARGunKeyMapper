@@ -1,4 +1,4 @@
-# ARGUN Mapper
+# AR GUN / BLASTER Mapper
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Android](https://img.shields.io/badge/Android-5.0%2B-brightgreen.svg)](https://developer.android.com/about/versions)
