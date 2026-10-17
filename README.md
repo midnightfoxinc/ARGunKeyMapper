@@ -42,24 +42,18 @@ screen, and runs on current Android phones, Android TV and Fire OS.
     <td align="center"><b>Provide Access</b></td>
     <td align="center"><b>Scanning</b></td>
     <td align="center"><b>Device found</b></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/1.png" style="width: 100%; height: auto;"></td>
-    <td><img src="docs/screenshots/4.png" style="width: 100%; height: auto;"></td>
-    <td><img src="docs/screenshots/2.png" style="width: 100%; height: auto;"></td>
-    <td><img src="docs/screenshots/3.png" style="width: 100%; height: auto;"></td>
-  </tr>
-  <tr>
     <td align="center"><b>Remembered device</b></td>
     <td align="center"><b>Key Mapping</b></td>
     <td align="center"><b>Modes</b></td>
-    <td></td>
   </tr>
-  <tr>
-    <td><img src="docs/screenshots/6.png" style="width: 100%; height: auto;"></td>
-    <td><img src="docs/screenshots/7.png" style="width: 100%; height: auto;"></td>
-    <td><img src="docs/screenshots/8.png" style="width: 100%; height: auto;"></td>
-    <td></td>
+  <tr style="vertical-align: top;">
+    <td><img src="docs/screenshots/1.png" style="display:block; width:100%; aspect-ratio:9/16; object-fit:cover; object-position:top;"></td>
+    <td><img src="docs/screenshots/4.png" style="display:block; width:100%; aspect-ratio:9/16; object-fit:cover; object-position:top;"></td>
+    <td><img src="docs/screenshots/2.png" style="display:block; width:100%; aspect-ratio:9/16; object-fit:cover; object-position:top;"></td>
+    <td><img src="docs/screenshots/3.png" style="display:block; width:100%; aspect-ratio:9/16; object-fit:cover; object-position:top;"></td>
+    <td><img src="docs/screenshots/6.png" style="display:block; width:100%; aspect-ratio:9/16; object-fit:cover; object-position:top;"></td>
+    <td><img src="docs/screenshots/7.png" style="display:block; width:100%; aspect-ratio:9/16; object-fit:cover; object-position:top;"></td>
+    <td><img src="docs/screenshots/8.png" style="display:block; width:100%; aspect-ratio:9/16; object-fit:cover; object-position:top;"></td>
   </tr>
 </table>
 
