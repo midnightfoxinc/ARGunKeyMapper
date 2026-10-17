@@ -39,15 +39,21 @@ screen, and runs on current Android phones, Android TV and Fire OS.
   <table>
   <tr>
     <td align="center"><b>Start screen</b></td>
+    <td align="center"><b>Provide Access</b></td>
     <td align="center"><b>Scanning</b></td>
     <td align="center"><b>Device found</b></td>
     <td align="center"><b>Remembered device</b></td>
+    <td align="center"><b>Key Mapping</b></td>
+    <td align="center"><b>Modes</b></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/1.png" width="270" height="480"></td>
+    <td><img src="docs/screenshots/4.png" width="270" height="480"></td>
     <td><img src="docs/screenshots/2.png" width="270" height="480"></td>
     <td><img src="docs/screenshots/3.png" width="270" height="480"></td>
     <td><img src="docs/screenshots/6.png" width="270" height="480"></td>
+    <td><img src="docs/screenshots/7.png" width="270" height="480"></td>
+    <td><img src="docs/screenshots/8.png" width="270" height="480"></td>
   </tr>
 </table>
 
